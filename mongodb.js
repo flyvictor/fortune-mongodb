@@ -14,7 +14,7 @@ adapter._init = function(options) {
                         options.flags;
   }
 
-  console.log("Connection string : %s", connectionString);
+  // console.log("Connection string : %s", connectionString);
     
   //Setup mongoose instance
   this.db = mongoose.createConnection(connectionString);
