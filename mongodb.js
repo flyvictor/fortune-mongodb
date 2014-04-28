@@ -6,7 +6,7 @@ var Promise = RSVP.Promise;
 var adapter = {};
 
 adapter._init = function (options) {
-  var connectionString = options.connectionString || '';
+  var connectionString = options.connectionString;
 
   if (!connectionString.length) {
     connectionString = 'mongodb://' +
