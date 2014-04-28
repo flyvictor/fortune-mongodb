@@ -1,18 +1,21 @@
-var mongoose = require('mongoose')
-, RSVP = require('rsvp')
-, _ = require('lodash');
+var mongoose = require('mongoose');
+var RSVP = require('rsvp');
+var _ = require('lodash');
 
+var Promise = RSVP.Promise;
 var adapter = {};
 
-adapter._init = function(options) {
+adapter._init = function (options) {
+  var connectionString = options.connectionString || '';
+
+  if (!connectionString.length) {
+    connectionString = 'mongodb://' +
+      (options.username ? options.username + ':' + options.password + '@' : '') +
+      options.host + (options.port ? ':' + options.port : '') + '/' + options.db;
+  }
 
   //Setup mongoose instance
-  this.db = mongoose.createConnection('mongodb://' +
-                                      (options.username ? options.username + ':' + options.password + '@' : '') +
-                                      options.host + (options.port ? ':' + options.port : '') + '/' + options.db,
-                                      options.flags
-                                     );
-
+  this.db = mongoose.createConnection(connectionString, options.flags);
 };
 
 /**
@@ -22,22 +25,21 @@ adapter._init = function(options) {
  */
 adapter._models = {};
 
-adapter.schema = function(name, schema, options) {
+adapter.schema = function (name, schema, options) {
   var refkeys = [];
-  
-  Mixed = mongoose.Schema.Types.Mixed;
+  var Mixed = mongoose.Schema.Types.Mixed;
 
-  _.each(schema, function(val, key) {
-    var obj = {}
-    , isArray = _.isArray(val)
-    , value = isArray ? val[0] : val
-    , isObject = _.isPlainObject(value)
-    , ref = isObject ? value.ref : value
-    , inverse = isObject ? value.inverse : undefined
-    , pkType = value.pkType || mongoose.Schema.Types.ObjectId;
-    
+  _.each(schema, function (val, key) {
+    var obj = {};
+    var isArray = _.isArray(val);
+    var value = isArray ? val[0] : val;
+    var isObject = _.isPlainObject(value);
+    var ref = isObject ? value.ref : value;
+    var inverse = isObject ? value.inverse : undefined;
+    var pkType = value.pkType || mongoose.Schema.Types.ObjectId;
+
     // Convert strings to associations
-    if(typeof ref == 'string') {
+    if (typeof ref == 'string') {
       obj.ref = ref;
       obj.inverse = inverse;
       obj.type = pkType;
@@ -49,8 +51,8 @@ adapter.schema = function(name, schema, options) {
     }
 
     // Convert native object to schema type Mixed
-    if(typeof value == 'function' && typeCheck(value) == 'object') {
-      if(isObject) {
+    if (typeof value == 'function' && typeCheck(value) == 'object') {
+      if (isObject) {
         schema[key].type = Mixed;
       } else {
         schema[key] = Mixed;
@@ -79,31 +81,30 @@ adapter.model = function(name, schema, options) {
   }
 };
 
-adapter.create = function(model, id, resource) {
+adapter.create = function (model, id, resource) {
   var _this = this;
+  if (!resource) {
 
-  if(!resource) {
     resource = id;
   } else {
     resource.id = id;
   }
   model = typeof model == 'string' ? this.model(model) : model;
   resource = this._serialize(model, resource);
-  return new RSVP.Promise(function(resolve, reject) {
-    model.create(resource, function(error, resource) {
+  return new Promise(function (resolve, reject) {
+    model.create(resource, function (error, resource) {
       _this._handleWrite(model, resource, error, resolve, reject);
     });
   });
 };
 
-adapter.update = function(model, id, update) {
+adapter.update = function (model, id, update) {
   var _this = this;
   model = typeof model == 'string' ? this.model(model) : model;
   update = this._serialize(model, update);
-
   var pk = model.pk || "_id";
   
-  return new RSVP.Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject) {
     var match = {};
     match[pk] = id;
     
@@ -113,13 +114,12 @@ adapter.update = function(model, id, update) {
   });
 };
 
-adapter.delete = function(model, id) {
+adapter.delete = function (model, id) {
   var _this = this;
   model = typeof model == 'string' ? this.model(model) : model;
-
   var pk = model.pk || "_id";
   
-  return new RSVP.Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject) {
     var match = {};
     match[pk] = id;
     model.findOneAndRemove(match).exec(function(error, resource){
@@ -148,12 +148,12 @@ adapter.find = function(model, query) {
     dbQuery[pk] = query;
   }
 
-  return new RSVP.Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject) {
     model.findOne(dbQuery, function(error, resource) {
       if(error || !resource) {
         return reject(error);
       }
-      resolve(_this._deserialize(model, resource));
+      return resolve(_this._deserialize(model, resource));
     });
   });
 };
@@ -183,12 +183,12 @@ adapter.findMany = function(model, query, limit) {
   
   limit = limit || 1000;
 
-  return new RSVP.Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject) {
     model.find(dbQuery).limit(limit).exec(function(error, resources) {
       if(error) {
         return reject(error);
       }
-      resources = resources.map(function(resource) {
+      resources = resources.map(function (resource) {
         return _this._deserialize(model, resource);
       });
       resolve(resources);
@@ -196,13 +196,13 @@ adapter.findMany = function(model, query, limit) {
   });
 };
 
-adapter.awaitConnection = function() {
+adapter.awaitConnection = function () {
   var _this = this;
-  return new RSVP.Promise(function(resolve, reject) {
-    _this.db.once('connected', function() {
+  return new Promise(function (resolve, reject) {
+    _this.db.once('connected', function () {
       resolve();
     });
-    _this.db.once('error', function(error) {
+    _this.db.once('error', function (error) {
       reject(error);
     });
   });
@@ -216,14 +216,14 @@ adapter.awaitConnection = function() {
  * @param {Object} resource
  * @return {Object}
  */
-adapter._serialize = function(model, resource) {
-  if(resource.hasOwnProperty('id')) {
+adapter._serialize = function (model, resource) {
+  if (resource.hasOwnProperty('id')) {
     resource._id = mongoose.Types.ObjectId(resource.id.toString());
 
     delete resource.id;
   }
-  if(resource.hasOwnProperty('links') && typeof resource.links == 'object') {
-    _.each(resource.links, function(value, key) {
+  if (resource.hasOwnProperty('links') && typeof resource.links == 'object') {
+    _.each(resource.links, function (value, key) {
       resource[key] = value;
     });
     delete resource.links;
@@ -240,22 +240,17 @@ adapter._serialize = function(model, resource) {
  * @param {Object} resource mongoose document
  * @return {Object}
  */
-adapter._deserialize = function(model, resource) {
+adapter._deserialize = function (model, resource) {
   var json = {};
   resource = resource.toObject();
 
   json.id = resource[model.pk || "_id"];
 
-  //var relations = [];
   model.schema.eachPath(function(path, type) {
     if(path == '_id' || path == '__v') return;
     json[path] = resource[path];
 
     var instance = type.instance || (type.caster ? type.caster.instance : undefined);
-
-    // if(path != '_id' && instance == 'ObjectID') {
-    //   relations.push(path);
-    // }
   });
 
   var relations = model.schema.refkeys;
@@ -269,8 +264,7 @@ adapter._deserialize = function(model, resource) {
       }
       delete json[relation];
     });
-
-    if(_.keys(links).length) {
+    if (_.keys(links).length) {
       json.links = links;
     }
   }
@@ -288,15 +282,14 @@ adapter._deserialize = function(model, resource) {
  * @param {Function} resolve
  * @param {Function} reject
  */
-adapter._handleWrite = function(model, resource, error, resolve, reject) {
+adapter._handleWrite = function (model, resource, error, resolve, reject) {
   var _this = this;
-  if(error) {
+  if (error) {
     return reject(error);
   }
-
   this._updateRelationships(model, resource).then(function(resource) {
     resolve(_this._deserialize(model, resource));
-  }, function(error) {
+  }, function (error) {
     reject(error);
   });
 };
@@ -310,17 +303,17 @@ adapter._handleWrite = function(model, resource, error, resolve, reject) {
  * @param {Object} resource
  * @return {Promise}
  */
-adapter._updateRelationships = function(model, resource) {
+adapter._updateRelationships = function (model, resource) {
   var _this = this;
 
   /**
    * Get fields that contain references.
    */
   var references = [];
-  _.each(model.schema.tree, function(value, key) {
-    var singular = !_.isArray(value)
-    , obj = singular ? value : value[0];
-    if(typeof obj == 'object' && obj.hasOwnProperty('ref')) {
+  _.each(model.schema.tree, function (value, key) {
+    var singular = !_.isArray(value);
+    var obj = singular ? value : value[0];
+    if (typeof obj == 'object' && obj.hasOwnProperty('ref')) {
       references.push({
         path: key,
         model: obj.ref,
@@ -346,8 +339,9 @@ adapter._updateRelationships = function(model, resource) {
         relatedTree = inverted;
       }
       _.each(relatedTree, function(value, key) {
-        var singular = !_.isArray(value)
-        , obj = singular ? value : value[0];
+        var singular = !_.isArray(value);
+        var obj = singular ? value : value[0];
+
         if(typeof obj == 'object' && obj.ref == model.modelName) {
           fields.push({
             path: key,
@@ -360,27 +354,27 @@ adapter._updateRelationships = function(model, resource) {
     }
     
     // Iterate over each relation
-    _.each(fields, function(field) {
+    _.each(fields, function (field) {
       // One-to-one
-      if(reference.singular && field.singular) {
+      if (reference.singular && field.singular) {
         promises.push(_this._updateOneToOne(
           model, relatedModel, resource, reference, field
         ));
       }
       // One-to-many
-      if(reference.singular && !field.singular) {
+      if (reference.singular && !field.singular) {
         promises.push(_this._updateOneToMany(
           model, relatedModel, resource, reference, field
         ));
       }
-      // // Many-to-one
-      if(!reference.singular && field.singular) {
+      // Many-to-one
+      if (!reference.singular && field.singular) {
         promises.push(_this._updateManyToOne(
           model, relatedModel, resource, reference, field
         ));
       }
-      // // Many-to-many
-      if(!reference.singular && !field.singular) {
+      // Many-to-many
+      if (!reference.singular && !field.singular) {
         promises.push(_this._updateManyToMany(
           model, relatedModel, resource, reference, field
         ));
@@ -388,11 +382,11 @@ adapter._updateRelationships = function(model, resource) {
     });
   });
 
-  return new RSVP.Promise(function(resolve, reject) {
+  return new Promise(function (resolve, reject) {
     RSVP.all(promises).then(
-      function() {
+      function () {
         resolve(resource);
-      }, function(errors) {
+      }, function (errors) {
         reject(errors);
       }
     );
@@ -409,12 +403,13 @@ adapter._updateRelationships = function(model, resource) {
  * @parameter {Object} field
  * @return {Promise}
  */
+
 adapter._updateOneToOne = function(model, relatedModel, resource, reference, field) {
-  return new RSVP.Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject) {
     // Dissociation
-    var dissociate = {$unset: {}},
-        pk = model.pk || "_id",
-        match = {};
+    var dissociate = {$unset: {}};
+    var pk = model.pk || "_id";
+    var match = {};
     match[field.path] = resource[pk];
 
     dissociate.$unset[field.path] = resource[pk];
@@ -451,7 +446,7 @@ adapter._updateOneToOne = function(model, relatedModel, resource, reference, fie
  * @return {Promise}
  */
 adapter._updateOneToMany = function(model, relatedModel, resource, reference, field) {
-  return new RSVP.Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject) {
     // Dissociation
     var dissociate = {$pull: {}},
         pk = model.pk || "_id",
@@ -459,7 +454,6 @@ adapter._updateOneToMany = function(model, relatedModel, resource, reference, fi
     match[field.path] = resource[pk];
 
     dissociate.$pull[field.path] = resource[pk];
-
     
     relatedModel.find(match).update(dissociate, function(error) {
       //console.log("1-m",error);
@@ -493,8 +487,7 @@ adapter._updateOneToMany = function(model, relatedModel, resource, reference, fi
  * @return {Promise}
  */
 adapter._updateManyToOne = function(model, relatedModel, resource, reference, field) {
-  return new RSVP.Promise(function(resolve, reject) {
-    
+  return new Promise(function(resolve, reject) {
     // Dissociation
     var dissociate = {$unset: {}},
         pk = model.pk || "_id",
@@ -504,7 +497,6 @@ adapter._updateManyToOne = function(model, relatedModel, resource, reference, fi
     dissociate.$unset[field.path] = 1;
 
     relatedModel.find(match).update(dissociate, function(error) {
-      //console.log("m-1",error);
       if(error) return reject(error);
 
       // Association
@@ -534,8 +526,7 @@ adapter._updateManyToOne = function(model, relatedModel, resource, reference, fi
  * @return {Promise}
  */
 adapter._updateManyToMany = function(model, relatedModel, resource, reference, field) {
-  return new RSVP.Promise(function(resolve, reject) {
-    
+  return new Promise(function(resolve, reject) {
     // Dissociation
     var dissociate = {$pull: {}},
         pk = model.pk || "_id",
@@ -556,9 +547,9 @@ adapter._updateManyToMany = function(model, relatedModel, resource, reference, f
       var match = {};
       match[relatedModel.pk || "_id"] = {$in: resource[reference.path] || []};
       
-      relatedModel.update(match, associate, {multi: true}, function(error) {
+      return relatedModel.update(match, associate, {multi: true}, function(error) {
         if(error) return reject(error);
-        resolve();
+        return resolve();
       });
     });
   });
@@ -572,12 +563,11 @@ adapter._updateManyToMany = function(model, relatedModel, resource, reference, f
  * @parameter {Object} resource
  * @return {Object}
  */
-adapter._dissociate = function(model, resource) {
-  model.schema.eachPath(function(path, type) {
-    var instance = type.instance ||
-          (type.caster ? type.caster.instance : undefined);
+adapter._dissociate = function (model, resource) {
+  model.schema.eachPath(function (path, type) {
+    var instance = type.instance || (type.caster ? type.caster.instance : undefined);
 
-    if(path != '_id' && instance == 'ObjectID') {
+    if (path != '_id' && instance == 'ObjectID') {
       resource[path] = null;
     }
   });
