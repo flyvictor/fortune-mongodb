@@ -121,12 +121,24 @@ adapter.delete = function (model, id) {
   
   return new Promise(function(resolve, reject) {
     var match = {};
-    match[pk] = id;
-    model.findOneAndRemove(match).exec(function(error, resource){
-      resource = _this._dissociate(model, resource);
-
-      _this._handleWrite(model, resource, error, resolve, reject);
+    if(id) match[pk] = id;
+    
+    model.find(match).exec(function(error,resources){
+      model.remove(match, function(error){
+        if(error){
+          reject(error);
+        } else {
+          resolve(resources);
+        }
+      });
     });
+  }).then(function(resources){
+    return RSVP.all(_.map(resources, function(resource){
+      return new Promise(function(resolve,reject){
+        _this._dissociate(model, resource);
+        _this._handleWrite(model, resource, null, resolve, reject);
+      });
+    }));
   });
 };
 
