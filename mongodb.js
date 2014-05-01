@@ -170,16 +170,6 @@ adapter.find = function(model, query) {
   });
 };
 
-var convertFields = function(obj,key,converter){
-  if(_.isObject(obj[key])){
-    _.each(obj[key], function(v,k){
-      convertFields(obj[key],k,converter);
-    });
-  }else{
-    obj[key] = converter(obj[key]);
-  }
-};
-
 adapter.findMany = function(model, query, limit) {
   var _this = this,
       dbQuery = {};
@@ -193,14 +183,6 @@ adapter.findMany = function(model, query, limit) {
       if(query.length) dbQuery[pk] = {$in: query};
     }else{
       dbQuery = _.clone(query);
-
-      _.each(dbQuery, function(val,key){
-        if(key !== "id"){
-          if(model.schema.tree[key] === Number){
-            convertFields(dbQuery, key, function(val){ return parseInt(val,10); });
-          }
-        }
-      });
 
       if(query.id){
         dbQuery[pk] = query.id;
