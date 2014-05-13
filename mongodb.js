@@ -178,6 +178,20 @@ adapter.findMany = function(model, query, limit) {
 
   var pk = model.pk || "_id";
 
+  _.each(query, function(val, key){
+    var m;
+    if(model.schema.tree[key] === Date && _.isString(val)){
+      m = moment(val);
+      
+      if(m.format("YYYY-MM-DD") === val){
+        query[key] = {
+          $gte: val,
+          $lte: moment(val).add("days", 1).format("YYYY-MM-DD")
+        };
+      }
+    } 
+  });
+
   if(_.isObject(query)){
     if(_.isArray(query)) {
       if(query.length) dbQuery[pk] = {$in: query};
