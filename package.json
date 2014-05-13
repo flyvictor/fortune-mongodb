@@ -16,7 +16,8 @@
   "dependencies": {
     "mongoose": "~3.8.8",
     "rsvp": "~3.0.6",
-    "lodash": "~2.4.1"
+    "lodash": "~2.4.1",
+    "moment": "~2.6.0"
   },
   "engines": {
     "node": "*"
