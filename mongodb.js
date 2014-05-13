@@ -1,7 +1,7 @@
 var mongoose = require('mongoose');
 var RSVP = require('rsvp');
 var _ = require('lodash');
-
+var moment = require("moment");
 var Promise = RSVP.Promise;
 var adapter = {};
 
