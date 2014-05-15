@@ -441,7 +441,7 @@ adapter._updateOneToOne = function(model, relatedModel, resource, reference, fie
     dissociate.$unset[field.path] = resource[pk];
     //relatedModel.where(field.path, resource[pk]).update(dissociate, function(error) {
 
-    relatedModel.find(match).update(dissociate, function(error) {
+    relatedModel.update(match, dissociate, function(error) {
       //console.log("1-1", error);
       if(error) return reject(error);
 
@@ -481,7 +481,7 @@ adapter._updateOneToMany = function(model, relatedModel, resource, reference, fi
 
     dissociate.$pull[field.path] = resource[pk];
     
-    relatedModel.find(match).update(dissociate, function(error) {
+    relatedModel.update(match, dissociate, function(error) {
       //console.log("1-m",error);
       
       if(error) return reject(error);
@@ -522,7 +522,7 @@ adapter._updateManyToOne = function(model, relatedModel, resource, reference, fi
 
     dissociate.$unset[field.path] = 1;
 
-    relatedModel.find(match).update(dissociate, function(error) {
+    relatedModel.update(match, dissociate, function(error) {
       if(error) return reject(error);
 
       // Association
@@ -561,7 +561,7 @@ adapter._updateManyToMany = function(model, relatedModel, resource, reference, f
 
     dissociate.$pull[field.path] = resource[pk];
 
-    relatedModel.find(match).update(dissociate, function(error) {
+    relatedModel.update(match, dissociate, function(error) {
       if(error)  return reject(error);
 
       // Association
