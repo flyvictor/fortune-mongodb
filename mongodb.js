@@ -38,6 +38,7 @@ adapter.schema = function (name, schema, options) {
     var inverse = isObject ? value.inverse : undefined;
     var pkType = value.pkType || mongoose.Schema.Types.ObjectId;
 
+
     // Convert strings to associations
     if (typeof ref == 'string') {
       obj.ref = ref;
@@ -52,6 +53,7 @@ adapter.schema = function (name, schema, options) {
 
     // Convert native object to schema type Mixed
     if (typeof value == 'function' && typeCheck(value) == 'object') {
+      
       if (isObject) {
         schema[key].type = Mixed;
       } else {
@@ -214,6 +216,7 @@ adapter.findMany = function(model, query, limit) {
       if(error) {
         return reject(error);
       }
+
       resources = resources.map(function (resource) {
         return _this._deserialize(model, resource);
       });
@@ -272,15 +275,10 @@ adapter._deserialize = function (model, resource) {
 
   json.id = resource[model.pk || "_id"];
 
-  model.schema.eachPath(function(path, type) {
-    if(path == '_id' || path == '__v') return;
-    json[path] = resource[path];
-
-    var instance = type.instance || (type.caster ? type.caster.instance : undefined);
-  });
-
-  var relations = model.schema.refkeys;
+  _.extend(json, _.omit(resource, "_id", "__v"));
   
+  var relations = model.schema.refkeys;
+
   if(relations.length) {
     var links = {};
 
