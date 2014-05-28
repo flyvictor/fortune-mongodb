@@ -25,9 +25,8 @@ adapter._init = function (options) {
  */
 adapter._models = {};
 
-adapter.schema = function (name, schema, options) {
+adapter.schema = function (name, schema, options, schemaCallback) {
   options = options || {};
-  
   var refkeys = [];
   var Mixed = mongoose.Schema.Types.Mixed;
   var pk = (options.model || {}).pk;
@@ -69,6 +68,9 @@ adapter.schema = function (name, schema, options) {
 
   schema = mongoose.Schema(schema, options);
   schema.refkeys = refkeys || [];
+  
+  if (schemaCallback)
+    schemaCallback(schema);
 
   return schema;
 
