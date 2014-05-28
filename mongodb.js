@@ -26,8 +26,10 @@ adapter._init = function (options) {
 adapter._models = {};
 
 adapter.schema = function (name, schema, options, schemaCallback) {
+  options = options || {};
   var refkeys = [];
   var Mixed = mongoose.Schema.Types.Mixed;
+  var pk = (options.model || {}).pk;
 
   _.each(schema, function (val, key) {
     var obj = {};
@@ -38,15 +40,15 @@ adapter.schema = function (name, schema, options, schemaCallback) {
     var inverse = isObject ? value.inverse : undefined;
     var pkType = value.pkType || mongoose.Schema.Types.ObjectId;
 
-
     // Convert strings to associations
-    if (typeof ref == 'string') {
-      obj.ref = ref;
-      obj.inverse = inverse;
-      obj.type = pkType;
-      obj.external = !!value.external;
-
-      schema[key] = isArray ? [obj] : obj;
+    if (typeof ref === 'string') {
+      schema[key] = {
+        ref: ref,
+        inverse: inverse,
+        type: isArray ? [pkType] : pkType,
+        external: !!value.external,
+        index: 1
+      };
 
       refkeys.push(key);
     }
@@ -61,6 +63,8 @@ adapter.schema = function (name, schema, options, schemaCallback) {
       }
     }
   });
+
+  if(pk) schema[pk] = { type: schema[pk], index: {unique: true}};
 
   schema = mongoose.Schema(schema, options);
   schema.refkeys = refkeys || [];
