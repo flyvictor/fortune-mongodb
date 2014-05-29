@@ -25,8 +25,9 @@ adapter._init = function (options) {
  */
 adapter._models = {};
 
-adapter.schema = function (name, schema, options, schemaCallback) {
+adapter.schema = function (name, schema, options) {
   options = options || {};
+  
   var refkeys = [];
   var Mixed = mongoose.Schema.Types.Mixed;
   var pk = (options.model || {}).pk;
@@ -38,17 +39,19 @@ adapter.schema = function (name, schema, options, schemaCallback) {
     var isObject = _.isPlainObject(value);
     var ref = isObject ? value.ref : value;
     var inverse = isObject ? value.inverse : undefined;
-    var pkType = value.pkType || mongoose.Schema.Types.ObjectId;
+    var pkType = value.type || value.pkType || mongoose.Schema.Types.ObjectId;
+    var fieldsToIndex = {};
 
     // Convert strings to associations
     if (typeof ref === 'string') {
-      schema[key] = {
+      var field = {
         ref: ref,
         inverse: inverse,
-        type: isArray ? [pkType] : pkType,
-        external: !!value.external,
-        index: 1
+        type: pkType,
+        external: !!value.external
       };
+
+      schema[key] = isArray ? [field] : field; 
 
       refkeys.push(key);
     }
@@ -67,10 +70,14 @@ adapter.schema = function (name, schema, options, schemaCallback) {
   if(pk) schema[pk] = { type: schema[pk], index: {unique: true}};
 
   schema = mongoose.Schema(schema, options);
-  schema.refkeys = refkeys || [];
-  
-  if (schemaCallback)
-    schemaCallback(schema);
+  schema.refkeys = refkeys;
+
+  _.each(refkeys, function(key){
+    var index = {};
+    index[key] = 1;
+    
+    schema.index(index);
+  });
 
   return schema;
 
