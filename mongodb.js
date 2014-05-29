@@ -25,7 +25,7 @@ adapter._init = function (options) {
  */
 adapter._models = {};
 
-adapter.schema = function (name, schema, options) {
+adapter.schema = function (name, schema, options, schemaCallback) {
   options = options || {};
   
   var refkeys = [];
@@ -79,6 +79,9 @@ adapter.schema = function (name, schema, options) {
     schema.index(index);
   });
 
+  if (schemaCallback)
+    schemaCallback(schema);
+  
   return schema;
 
   function typeCheck(fn) {
