@@ -195,7 +195,7 @@ describe('MongoDB adapter', function(){
       });
       it('should apply be able to apply defaults for query and projection', function(done){
         (function(){
-          adapter.find('person');
+          adapter.find('person', ids.person[0]);
         }).should.not.throw();
         done();
       });
