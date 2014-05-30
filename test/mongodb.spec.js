@@ -96,4 +96,109 @@ describe('MongoDB adapter', function(){
       });
     });
   });
+  describe('Select', function(){
+    describe('findMany', function(){
+      it('should provide interface for selecting fields to return', function(done){
+        var projection = {
+          select: ['name']
+        };
+        (function(){
+          adapter.findMany('person', {}, projection)
+            .then(function(docs){
+              should.exist(docs);
+              done();
+            });
+        }).should.not.throw();
+      });
+      it('should select specified fields for a collection', function(done){
+        var projection = {
+          select: ['name']
+        };
+        adapter.findMany('person', {}, projection)
+          .then(function(docs){
+            //email is included behind the scenes to provide id
+            (Object.keys(docs[0]).length).should.equal(2);
+            should.exist(docs[0].name);
+            should.exist(docs[0].id);
+            done();
+          });
+      });
+      it('should return all existing fields when no select is specified', function(done){
+        adapter.findMany('person')
+          .then(function(docs){
+            (Object.keys(docs[0]).length).should.equal(4);
+            done();
+          });
+      });
+      it('should not affect business id selection', function(done){
+        adapter.findMany('person', [ids.person[0]], {select: ['name']})
+          .then(function(docs){
+            (docs[0].id).should.equal(ids.person[0]);
+            should.not.exist(docs[0].email);
+            done();
+          });
+      });
+      it('should apply be able to apply defaults for query and projection', function(done){
+        (function(){
+          adapter.findMany('person');
+        }).should.not.throw();
+        done();
+      });
+      it('should be able to work with numerical limits', function(done){
+        (function(){
+          adapter.findMany('person', 1)
+            .then(function(docs){
+              (docs.length).should.equal(1);
+              done();
+            });
+        }).should.not.throw();
+      });
+    });
+    describe('find', function(){
+      it('should provide interface for selecting fields to return', function(done){
+        var projection = {
+          select: ['name']
+        };
+        (function(){
+          adapter.find('person', {email: ids.person[0]}, projection)
+            .then(function(docs){
+              should.exist(docs);
+              done();
+            });
+        }).should.not.throw();
+      });
+      it('should select specified fields for a single document', function(done){
+        var projection = {
+          select: ['name']
+        };
+        adapter.find('person', ids.person[0], projection)
+          .then(function(doc){
+            (Object.keys(doc).length).should.equal(2);
+            should.exist(doc.name);
+            done();
+          });
+      });
+      it('should return all existing fields when no select is specified', function(done){
+        adapter.find('person', ids.person[0])
+          .then(function(doc){
+            (Object.keys(doc).length).should.equal(4);
+            done();
+          });
+      });
+      it('should not affect business id selection', function(done){
+        adapter.find('person', [ids.person[0]], {select: ['name']})
+          .then(function(doc){
+            (doc.id).should.equal(ids.person[0]);
+            should.not.exist(doc.email);
+            done();
+          });
+      });
+      it('should apply be able to apply defaults for query and projection', function(done){
+        (function(){
+          adapter.find('person');
+        }).should.not.throw();
+        done();
+      });
+    });
+  });
 });
