@@ -264,6 +264,7 @@ adapter.awaitConnection = function () {
  */
 adapter._serialize = function (model, resource) {
   if (resource.hasOwnProperty('id')) {
+    //TODO: This may cause WEB-2618 issue. Test for /[0-9a-f]{24}/ before casting
     resource._id = mongoose.Types.ObjectId(resource.id.toString());
 
     delete resource.id;
@@ -576,7 +577,7 @@ adapter._updateManyToMany = function(model, relatedModel, resource, reference, f
 
     dissociate.$pull[field.path] = resource[pk];
 
-    relatedModel.update(match, dissociate, function(error) {
+    relatedModel.update(match, dissociate, {multi: true}, function(error) {
       if(error)  return reject(error);
 
       // Association
