@@ -161,7 +161,14 @@ adapter.delete = function (model, id) {
   });
 };
 
-adapter.find = function(model, query) {
+/**
+ *
+ * @param model {Model}
+ * @param query {Object}
+ * @param projection {Object}
+ * @returns {Promise}
+ */
+adapter.find = function(model, query, projection) {
   var _this = this,
       dbQuery = {};
 
@@ -179,17 +186,43 @@ adapter.find = function(model, query) {
     dbQuery[pk] = query;
   }
 
+  projection = projection || {};
+  projection.select = projection.select || '';
+
+  var pkNotRequested = false;
+  if (_.isArray(projection.select)){
+    if (model.pk){
+      if (projection.select.indexOf(model.pk) === -1){
+        projection.select.push(model.pk);
+        pkNotRequested = true;
+      }
+    }
+    projection.select = projection.select.join(' ');
+  }
+
   return new Promise(function(resolve, reject) {
-    model.findOne(dbQuery, function(error, resource) {
+    model.findOne(dbQuery).select(projection.select).exec(function(error, resource) {
       if(error || !resource) {
         return reject(error);
       }
-      return resolve(_this._deserialize(model, resource));
+      var doc = _this._deserialize(model, resource);
+      if (pkNotRequested){
+        delete doc[model.pk];
+      }
+      return resolve(doc);
     });
   });
 };
 
-adapter.findMany = function(model, query, limit) {
+/**
+ *
+ * @param model {Model || String}
+ * @param query {Object}
+ * //@param limit {Number} - deprecated as unused
+ * @param projection {Object}
+ * @returns {Promise}
+ */
+adapter.findMany = function(model, query, projection) {
   var _this = this,
       dbQuery = {};
 
@@ -222,21 +255,45 @@ adapter.findMany = function(model, query, limit) {
         delete dbQuery.id;
       }
     }
-  } else if(typeof query == 'number') {
-    limit = query;
+  }else if(typeof query === 'number' && arguments.length === 2){
+    //Just for possible backward compatibility issues
+    projection = projection || {};
+    projection.limit = projection.limit = query;
   }
-  
-  limit = limit || 1000;
+
+  projection = projection || {};
+  projection.limit = projection.limit || 1000;
+  projection.select = projection.select || '';
+
+  //Ensure business id is included to selection
+  var pkNotRequested = false;
+  if (_.isArray(projection.select)){
+    if (model.pk){
+      if (projection.select.indexOf(model.pk) === -1){
+        projection.select.push(model.pk);
+        pkNotRequested = true;
+      }
+    }
+    projection.select = projection.select.join(' ');
+  }
 
   return new Promise(function(resolve, reject) {
-    model.find(dbQuery).limit(limit).exec(function(error, resources) {
-      if(error) {
-        return reject(error);
-      }
+    model.find(dbQuery)
+      .limit(projection.limit)
+      .select(projection.select)
+      .exec(function(error, resources) {
+        if(error) {
+          return reject(error);
+        }
 
-      resources = resources.map(function (resource) {
-        return _this._deserialize(model, resource);
-      });
+        resources = resources.map(function (resource) {
+          var temp = _this._deserialize(model, resource);
+          if (pkNotRequested){
+            //Remove business pk field if it's not required
+            delete temp[model.pk];
+          }
+          return temp;
+        });
       resolve(resources);
     });
   });
@@ -264,6 +321,7 @@ adapter.awaitConnection = function () {
  */
 adapter._serialize = function (model, resource) {
   if (resource.hasOwnProperty('id')) {
+    //TODO: This may cause WEB-2618 issue. Test for /[0-9a-f]{24}/ before casting
     resource._id = mongoose.Types.ObjectId(resource.id.toString());
 
     delete resource.id;
@@ -288,6 +346,7 @@ adapter._serialize = function (model, resource) {
  */
 adapter._deserialize = function (model, resource) {
   var json = {};
+  //TODO: Add lean(true) to find methods to increase performance
   resource = resource.toObject();
 
   json.id = resource[model.pk || "_id"];
@@ -576,7 +635,7 @@ adapter._updateManyToMany = function(model, relatedModel, resource, reference, f
 
     dissociate.$pull[field.path] = resource[pk];
 
-    relatedModel.update(match, dissociate, function(error) {
+    relatedModel.update(match, dissociate, {multi: true}, function(error) {
       if(error)  return reject(error);
 
       // Association
